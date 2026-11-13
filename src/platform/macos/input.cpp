@@ -4,12 +4,15 @@
  */
 // standard includes
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <thread>
 
 // platform includes
@@ -26,6 +29,7 @@
 #include "src/logging.h"
 #include "src/platform/common.h"
 #include "src/platform/macos/display_policy.h"
+#include "src/platform/macos/ojd_gamepad.h"
 #include "src/platform/macos/virtual_display.h"
 #include "src/utility.h"
 
@@ -59,7 +63,14 @@ namespace platf {
     int scroll_lines_per_detent {DEFAULT_SCROLL_LINES_PER_DETENT};
     bool mouse_down[3] {};  // mouse button status
     std::chrono::steady_clock::steady_clock::time_point last_mouse_event[3][2];  // timestamp of last mouse events
+
+    // Virtual gamepads, by global index.
+    std::array<std::unique_ptr<ojd::feed_t>, MAX_GAMEPADS> gamepads;
   };
+
+  // ojd_protocol.h repeats Moonlight's button flags so it stands alone in its tests.
+  static_assert(ojd::button::dpad_up == DPAD_UP && ojd::button::start == START && ojd::button::left_button == LEFT_BUTTON &&
+                ojd::button::home == HOME && ojd::button::a == A && ojd::button::y == Y);
 
   // Input coordinates are based on the display's points, not its pixels (Retina is 2 pixels per point).
   CGFloat display_scaling(const CGDirectDisplayID display) {
@@ -383,17 +394,51 @@ const KeyCodeMap kKeyCodesMap[] = {
     BOOST_LOG(info) << "unicode: Unicode input not yet implemented for MacOS."sv;
   }
 
+  // macOS lets only an app with Apple's virtual HID entitlement publish a gamepad, so the gamepads
+  // go through OpenJoystickDriver, a separately installed app that has it. See docs/macos/gamepad.md.
   int alloc_gamepad(input_t &input, const gamepad_id_t &id, const gamepad_arrival_t &metadata, feedback_queue_t feedback_queue) {
-    BOOST_LOG(info) << "alloc_gamepad: Gamepad not yet implemented for MacOS."sv;
-    return -1;
+    auto macos_input = static_cast<macos_input_t *>(input.get());
+    if (id.globalIndex < 0 || id.globalIndex >= static_cast<int>(macos_input->gamepads.size())) {
+      return -1;
+    }
+    const auto settings = ojd::load_settings();
+    if (!settings) {
+      BOOST_LOG(info) << "Gamepad: not set up. macOS gamepads need OpenJoystickDriver and its token in "sv << (platf::appdata() / "ojd_token").string();
+      return -1;
+    }
+
+    const auto client_index = id.clientRelativeIndex;
+    auto on_rumble = [feedback_queue = std::move(feedback_queue), client_index](std::uint16_t low, std::uint16_t high, std::uint16_t left_trigger, std::uint16_t right_trigger) {
+      feedback_queue->raise(gamepad_feedback_msg_t::make_rumble(client_index, low, high));
+      if (left_trigger || right_trigger) {
+        feedback_queue->raise(gamepad_feedback_msg_t::make_rumble_triggers(client_index, left_trigger, right_trigger));
+      }
+    };
+    macos_input->gamepads[id.globalIndex] = std::make_unique<ojd::feed_t>(*settings, std::move(on_rumble));
+    return 0;
   }
 
   void free_gamepad(input_t &input, int nr) {
-    BOOST_LOG(info) << "free_gamepad: Gamepad not yet implemented for MacOS."sv;
+    auto macos_input = static_cast<macos_input_t *>(input.get());
+    if (nr >= 0 && nr < static_cast<int>(macos_input->gamepads.size())) {
+      macos_input->gamepads[nr].reset();
+    }
   }
 
   void gamepad_update(input_t &input, int nr, const gamepad_state_t &gamepad_state) {
-    BOOST_LOG(info) << "gamepad: Gamepad not yet implemented for MacOS."sv;
+    auto macos_input = static_cast<macos_input_t *>(input.get());
+    if (nr < 0 || nr >= static_cast<int>(macos_input->gamepads.size()) || !macos_input->gamepads[nr]) {
+      return;
+    }
+    ojd::pad_state_t state;
+    state.buttons = gamepad_state.buttonFlags;
+    state.left_trigger = gamepad_state.lt;
+    state.right_trigger = gamepad_state.rt;
+    state.left_x = gamepad_state.lsX;
+    state.left_y = gamepad_state.lsY;
+    state.right_x = gamepad_state.rsX;
+    state.right_y = gamepad_state.rsY;
+    macos_input->gamepads[nr]->update(state);
   }
 
   // returns current mouse location:
@@ -1172,9 +1217,17 @@ const KeyCodeMap kKeyCodesMap[] = {
   }
 
   std::vector<supported_gamepad_t> &supported_gamepads(input_t *input) {
+    // Available once OpenJoystickDriver's token is in place; its persona decides the gamepad type.
     static std::vector gamepads {
       supported_gamepad_t {"", false, "gamepads.macos_not_implemented"}
     };
+    static std::once_flag configured;
+    std::call_once(configured, []() {
+      if (ojd::load_settings()) {
+        // An Xbox-style pad in every persona.
+        gamepads = {supported_gamepad_t {"auto", true, ""}, supported_gamepad_t {"xone", true, ""}};
+      }
+    });
 
     return gamepads;
   }

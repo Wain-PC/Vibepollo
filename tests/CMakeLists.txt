@@ -1874,6 +1874,9 @@ if(APPLE)
         PRODUCT_SOURCES "${SUNSHINE_TEST_REPOSITORY_ROOT}/src/platform/macos/av_audio_policy.cpp")
     sunshine_register_component(NAME test_component_macos_display_policy TEST_SOURCE unit/platform/macos/test_display_policy.cpp
         PRODUCT_SOURCES "${SUNSHINE_TEST_REPOSITORY_ROOT}/src/platform/macos/display_policy.cpp")
+    sunshine_register_component(NAME test_component_macos_ojd_protocol TEST_SOURCE unit/platform/macos/test_ojd_protocol.cpp
+        PRODUCT_SOURCES "${SUNSHINE_TEST_REPOSITORY_ROOT}/src/platform/macos/ojd_protocol.cpp"
+        LINK_LIBRARIES nlohmann_json::nlohmann_json)
 endif()
 
 
