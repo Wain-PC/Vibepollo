@@ -19,3 +19,9 @@ refreshes only the packing program, preserving all other programs/reflection.
 Linux host patch: DMA-BUF memory import duplicates its input FD before Vulkan allocation,
 consuming the original only after image creation succeeds. Failure leaves the input FD
 owned by the caller, including failures after memory allocation. No bitstream changes.
+
+metal/ is upstream's Metal port at the same commit, used by the macOS host
+encoder, with patches-metal/ applied: 0101 mirrors patches 0002 and 0010, 0102 is
+upstream 79a3232 (P010 input) and 0103 adds 16-bit single plane input. They change
+buffer sizing, padding and input wrapping only, so Metal streams decode with the
+Vulkan decoder at this commit.

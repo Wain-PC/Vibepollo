@@ -17,8 +17,13 @@ option(SUNSHINE_CONFIGURE_ONLY "Configure special files only, then exit." OFF)
 option(SUNSHINE_ENABLE_TRAY "Enable system tray icon." ON)
 option(SUNSHINE_ENABLE_WEBRTC "Enable WebRTC streaming support (Windows only)." OFF)
 
-# PyroWave GPU encoders are available on Windows and Linux.
-if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+# PyroWave GPU encoders are available on Windows, Linux and Apple Silicon Macs
+# (the Metal port does not run on Intel or AMD GPUs).
+set(_pyrowave_macos_arch "${CMAKE_OSX_ARCHITECTURES}")
+if(NOT _pyrowave_macos_arch)
+    set(_pyrowave_macos_arch "${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR (APPLE AND _pyrowave_macos_arch STREQUAL "arm64"))
     option(SUNSHINE_ENABLE_PYROWAVE "Enable the PyroWave video codec." ON)
 else()
     option(SUNSHINE_ENABLE_PYROWAVE "Enable the PyroWave video codec." OFF)

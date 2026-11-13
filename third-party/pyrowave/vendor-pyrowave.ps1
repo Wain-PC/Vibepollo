@@ -10,6 +10,10 @@ GRANITE_COMMIT identical in both repositories and record them in VENDOR.txt.
 patches/ and VENDOR.txt in moonlight-qt/pyrowave and
 vibeshine/third-party/pyrowave must stay identical.
 
+patches-metal/ is host only: it is applied after patches/ to upstream's Metal
+port (metal/), which the macOS host encodes with. It must not change the
+bitstream, since clients decode with the Vulkan code above.
+
 The result replaces <Destination> completely. Run from any directory:
 
     powershell -File third-party\pyrowave\vendor-pyrowave.ps1
@@ -19,6 +23,7 @@ CMakeLists.txt next to this script (vibeshine's build wrapper) is not touched.
 param(
     [string]$Destination = (Join-Path $PSScriptRoot "pyrowave"),
     [string]$PatchDir = (Join-Path $PSScriptRoot "patches"),
+    [string]$MetalPatchDir = (Join-Path $PSScriptRoot "patches-metal"),
     [string]$WorkDir = (Join-Path ([System.IO.Path]::GetTempPath()) "pyrowave-vendor"),
     [string]$PyroWaveCommit = "186f0393b77f7755953b5ecde994bb1cec2e4155",
     [string]$GraniteCommit = "b6cffd5ce81f540f0855e6778428483e14763d9b"
@@ -60,8 +65,8 @@ if (Test-Path $Destination) {
 New-Item -ItemType Directory -Force $Destination | Out-Null
 
 # PyroWave: the library, its C API, the checked-in SPIR-V, the bitstream spec and
-# the upstream C API / interop tests. Development tools, evaluation data, the
-# Metal port and sample assets are dropped.
+# the upstream C API / interop tests. Development tools, evaluation data and
+# sample assets are dropped.
 $pyroKeep = @(
     "CMakeLists.txt", "LICENSE", "README.md", "checkout_granite.sh", "slangmosh.sh",
     "link.T", "pyrowave-shared.def", "pyrowave.h", "pyrowave_c.cpp",
@@ -77,6 +82,9 @@ foreach ($item in $pyroKeep) {
 foreach ($dir in @("bitstream", "shaders", "pkg-config")) {
     Copy-Item -Recurse (Join-Path $pyroSrc $dir) (Join-Path $Destination $dir)
 }
+# The Metal port (macOS host encoder), without its Xcode project.
+Copy-Item -Recurse (Join-Path $pyroSrc "metal") (Join-Path $Destination "metal")
+Remove-Item -Recurse -Force (Join-Path $Destination "metal/pyrowave.xcodeproj")
 New-Item -ItemType Directory -Force (Join-Path $Destination "eval-results") | Out-Null
 Copy-Item (Join-Path $pyroSrc "eval-results\pyrowave_regression_results.h") (Join-Path $Destination "eval-results")
 
@@ -110,10 +118,13 @@ Get-ChildItem -Recurse (Join-Path $headersDst "include") -Include *.hpp, *.cppm 
 Get-ChildItem -Recurse -Force $Destination -Include .git, .github, .gitmodules | Remove-Item -Recurse -Force
 
 # Local patches, applied in name order. Each one documents why it exists.
-if (Test-Path $PatchDir) {
-    foreach ($patch in (Get-ChildItem $PatchDir -Filter *.patch | Sort-Object Name)) {
-        Write-Host "Applying $($patch.Name)"
-        Invoke-Git -C $Destination apply --whitespace=nowarn -p1 $patch.FullName
+# The Metal patches come last: 0101 regenerates a shader from patch 0010's output.
+foreach ($dir in @($PatchDir, $MetalPatchDir)) {
+    if (Test-Path $dir) {
+        foreach ($patch in (Get-ChildItem $dir -Filter *.patch | Sort-Object Name)) {
+            Write-Host "Applying $($patch.Name)"
+            Invoke-Git -C $Destination apply --whitespace=nowarn -p1 $patch.FullName
+        }
     }
 }
 
@@ -141,6 +152,12 @@ sign bits and word-alignment tails on the GPU so identical coefficients produce
 identical records. It changes no decoded values or
 Vulkan feature requirements. scripts/regenerate-pyrowave-block-packing.py
 refreshes only the packing program, preserving all other programs/reflection.
+
+metal/ is upstream's Metal port at the same commit, used by the macOS host
+encoder, with patches-metal/ applied: 0101 mirrors patches 0002 and 0010, 0102 is
+upstream 79a3232 (P010 input) and 0103 adds 16-bit single plane input. They change
+buffer sizing, padding and input wrapping only, so Metal streams decode with the
+Vulkan decoder at this commit.
 "@ | Set-Content -Encoding utf8 (Join-Path (Split-Path $Destination) "VENDOR.txt")
 
 Write-Host "PyroWave vendored into $Destination"

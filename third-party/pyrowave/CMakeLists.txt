@@ -6,11 +6,44 @@
 #
 # Consumers link `pyrowave::capi` and include <pyrowave.h> after
 # <vulkan/vulkan_core.h>; both include directories are provided by the target.
+# macOS builds the Metal port instead; see the APPLE branch below.
 
 set(PYROWAVE_VENDOR_DIR "${CMAKE_CURRENT_SOURCE_DIR}/pyrowave")
 if(NOT EXISTS "${PYROWAVE_VENDOR_DIR}/pyrowave.h")
     message(FATAL_ERROR "Vendored PyroWave is missing at ${PYROWAVE_VENDOR_DIR}. "
             "Run third-party/pyrowave/vendor-pyrowave.ps1.")
+endif()
+
+if(APPLE)
+    # macOS encodes with upstream's Metal port (pyrowave/metal), which has no
+    # Granite or Vulkan dependency: its shaders are checked-in MSL compiled at
+    # runtime. It emits the same bitstream as the Vulkan code at this commit, so
+    # clients still decode with the Vulkan decoder. Apple Silicon only.
+    #
+    # Consumers link `pyrowave::capi` and include <pyrowave_metal.h>.
+    set(PYROWAVE_METAL_DIR "${PYROWAVE_VENDOR_DIR}/metal")
+    add_library(pyrowave-metal STATIC
+            "${PYROWAVE_METAL_DIR}/pyrowave_bitstream.cpp"
+            "${PYROWAVE_METAL_DIR}/pyrowave_common.mm"
+            "${PYROWAVE_METAL_DIR}/pyrowave_decoder.mm"
+            "${PYROWAVE_METAL_DIR}/pyrowave_encoder.mm")
+    # The project does not enable OBJCXX, so .mm files build as CXX and take
+    # their Objective-C++ options per target.
+    target_compile_options(pyrowave-metal PRIVATE -fobjc-arc -fvisibility=hidden -w)
+    set_target_properties(pyrowave-metal PROPERTIES
+            CXX_STANDARD 14
+            POSITION_INDEPENDENT_CODE ON)
+    find_library(PYROWAVE_IOSURFACE_LIBRARY IOSurface REQUIRED)
+    find_library(PYROWAVE_METAL_LIBRARY Metal REQUIRED)
+    target_link_libraries(pyrowave-metal PRIVATE
+            ${PYROWAVE_IOSURFACE_LIBRARY} ${PYROWAVE_METAL_LIBRARY})
+
+    add_library(pyrowave-capi-interface INTERFACE)
+    target_include_directories(pyrowave-capi-interface INTERFACE "${PYROWAVE_METAL_DIR}")
+    target_link_libraries(pyrowave-capi-interface INTERFACE pyrowave-metal
+            ${PYROWAVE_IOSURFACE_LIBRARY} ${PYROWAVE_METAL_LIBRARY})
+    add_library(pyrowave::capi ALIAS pyrowave-capi-interface)
+    return()
 endif()
 
 # Granite is only the Vulkan backend the codec is written against; none of its
