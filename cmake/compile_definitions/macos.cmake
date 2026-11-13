@@ -96,3 +96,17 @@ if(SUNSHINE_ENABLE_TRAY)
 endif()
 
 list(APPEND PLATFORM_TARGET_FILES "${CMAKE_SOURCE_DIR}/src/platform/macos/managed_app_focus.mm")
+
+# PyroWave encodes with the vendored Metal port (third-party/pyrowave). Without it,
+# src/pyrowave_host.cpp provides the unavailable stub.
+if(SUNSHINE_ENABLE_PYROWAVE)
+    set_source_files_properties("${CMAKE_SOURCE_DIR}/src/platform/macos/pyrowave_core.mm"
+            PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    find_library(METAL_LIBRARY Metal REQUIRED)
+    find_library(IO_SURFACE_LIBRARY IOSurface REQUIRED)
+    list(APPEND SUNSHINE_EXTERNAL_LIBRARIES ${METAL_LIBRARY} ${IO_SURFACE_LIBRARY})
+    list(APPEND PLATFORM_TARGET_FILES
+            "${CMAKE_SOURCE_DIR}/src/platform/macos/pyrowave_core.h"
+            "${CMAKE_SOURCE_DIR}/src/platform/macos/pyrowave_core.mm"
+            "${CMAKE_SOURCE_DIR}/src/platform/macos/pyrowave_encode.cpp")
+endif()

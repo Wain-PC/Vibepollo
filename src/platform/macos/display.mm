@@ -583,6 +583,11 @@ namespace platf {
       // (the same default as video.cpp: a fifth of the stream's rate, at least 10 fps).
       const double minimum_fps = config::video.minimum_fps_target > 0 ? config::video.minimum_fps_target : std::max(config.framerate / 5.0, 10.0);
       capture.keepaliveInterval = CMTimeMakeWithSeconds(1.0 / minimum_fps, 1000000);
+      if (config.videoFormat == 3 && display->hdr) {
+        // PyroWave converts RGB itself and never asks for a pixel format, and the capture is HDR
+        // only in a 10-bit one. Take 10-bit RGB, which also serves 4:4:4.
+        capture.pixelFormat = kCVPixelFormatType_ARGB2101010LEPacked;
+      }
       display->av_capture = capture;
     } else {
       display->av_capture = [[AVVideo alloc] initWithDisplay:display->display_id frameRate:config.framerate];

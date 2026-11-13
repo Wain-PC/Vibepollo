@@ -6,10 +6,12 @@
  * src/platform/windows/pyrowave_encode.cpp instead.
  *
  * Linux builds use src/platform/linux/pyrowave_encode.cpp.
+ *
+ * macOS builds use src/platform/macos/pyrowave_encode.cpp.
  */
 #include "pyrowave_host.h"
 
-#if !((defined(_WIN32) || defined(__linux__)) && defined(SUNSHINE_ENABLE_PYROWAVE))
+#if !((defined(_WIN32) || defined(__linux__) || defined(__APPLE__)) && defined(SUNSHINE_ENABLE_PYROWAVE))
 
   #include "platform/common.h"
 

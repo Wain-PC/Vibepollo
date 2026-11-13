@@ -162,7 +162,9 @@
   configuration.width = self.frameWidth;
   configuration.height = self.frameHeight;
   configuration.pixelFormat = self.pixelFormat;
-  if (self.hdr && self.pixelFormat == kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange) {
+  const BOOL tenBit = self.pixelFormat == kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange ||
+                     self.pixelFormat == kCVPixelFormatType_ARGB2101010LEPacked;
+  if (self.hdr && tenBit) {
     // The stream's HDR color space, so the frames go to the encoder as they are. captureDynamicRange
     // is new in macOS 15; set it by name so builds with an older SDK, such as the Apple Silicon CI's
     // Xcode 15, still capture HDR. 1 is SCCaptureDynamicRangeHDRLocalDisplay.

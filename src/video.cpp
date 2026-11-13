@@ -7434,7 +7434,12 @@ namespace video {
     const bool supported = pyrowave::host::probe(adapter, detail);
     const auto elapsed = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started);
     if (supported) {
-      BOOST_LOG(info) << "Found PyroWave encoder [Vulkan] (probe took "sv << elapsed.count() << " ms)"sv;
+#ifdef __APPLE__
+      constexpr auto pyrowave_backend = "Metal"sv;
+#else
+      constexpr auto pyrowave_backend = "Vulkan"sv;
+#endif
+      BOOST_LOG(info) << "Found PyroWave encoder ["sv << pyrowave_backend << "] (probe took "sv << elapsed.count() << " ms)"sv;
       return 2;
     }
     BOOST_LOG(info) << "PyroWave is unavailable: "sv << detail;
