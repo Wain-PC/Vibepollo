@@ -588,7 +588,7 @@ namespace platf::macos_virtual_display {
       make_main(display.id);
     }
 
-    // With HiDPI, macOS defaults to the standard-density variant of the mode, so pick the exact pixel size.
+    // Switch the display to the mode with exactly this pixel size, once macOS lists it.
     void select_mode(const CGDirectDisplayID id, const size_t pixel_width, const size_t pixel_height) {
       NSDictionary *options = @{(__bridge NSString *) kCGDisplayShowDuplicateLowResolutionModes: @YES};
       CGDisplayModeRef chosen = nullptr;
@@ -704,10 +704,14 @@ namespace platf::macos_virtual_display {
         return nullptr;
       }
 
-      if (hidpi) {
-        select_mode(result->id, pixel_width, pixel_height);
-      }
+      // macOS picks the first mode from the display's density: the standard-density variant of a
+      // HiDPI mode, or a scaled-down mode for a large standard-density display, such as 1920x1080
+      // on a 3840x2160 one. Either would be captured and scaled back up, so pick the exact size.
+      select_mode(result->id, pixel_width, pixel_height);
       std::tie(result->pixel_width, result->pixel_height) = current_pixels(result->id);
+      if (result->pixel_width != pixel_width || result->pixel_height != pixel_height) {
+        BOOST_LOG(warning) << "Virtual display: macOS gave it "sv << result->pixel_width << 'x' << result->pixel_height << " instead of "sv << pixel_width << 'x' << pixel_height;
+      }
       other_modes.restore(1s);
       BOOST_LOG(info) << "Virtual display: "sv << name.UTF8String << ' ' << pixel_width << 'x' << pixel_height << '@' << refresh << "Hz"sv
                       << (make_hdr ? " HDR"sv : ""sv)
