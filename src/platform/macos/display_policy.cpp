@@ -94,6 +94,17 @@ namespace platf::macos_display_policy {
     return size;
   }
 
+  physical_size_t virtual_display_physical_size(const int pixel_width, const int pixel_height, const bool hidpi) {
+    constexpr double longest_side_mm = 600.0;
+    const double ppi = hidpi ? 220.0 : 110.0;
+    physical_size_t size {pixel_width / ppi * 25.4, pixel_height / ppi * 25.4};
+    if (const double longest = std::max(size.width_mm, size.height_mm); longest > longest_side_mm) {
+      size.width_mm *= longest_side_mm / longest;
+      size.height_mm *= longest_side_mm / longest;
+    }
+    return size;
+  }
+
   std::optional<display_id_t> parse_display_identity(const std::string_view output_name) {
     display_id_t id = 0;
     const auto end = output_name.data() + output_name.size();

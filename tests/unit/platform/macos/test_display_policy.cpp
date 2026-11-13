@@ -328,6 +328,33 @@ TEST(MacosVirtualDisplaySize, OddRetinaSizesRoundDown) {
   EXPECT_EQ(size.pixel_height, 1080);
 }
 
+TEST(MacosVirtualDisplayPhysicalSize, SmallDisplaysKeepTheirDensity) {
+  // 1920x1080 at 110 pixels per inch, and a Retina 5120x2880 at 220.
+  const auto standard = virtual_display_physical_size(1920, 1080, false);
+  EXPECT_NEAR(standard.width_mm, 1920 / 110.0 * 25.4, 0.01);
+  EXPECT_NEAR(standard.height_mm, 1080 / 110.0 * 25.4, 0.01);
+  const auto retina = virtual_display_physical_size(5120, 2880, true);
+  EXPECT_NEAR(retina.width_mm, 5120 / 220.0 * 25.4, 0.01);
+}
+
+TEST(MacosVirtualDisplayPhysicalSize, LargeDisplaysStayWithinWhatMacosBringsOnline) {
+  // 3840x2160 at 110 pixels per inch would be 886 mm wide, which macOS 27 never brings online.
+  for (const bool hidpi : {false, true}) {
+    const auto size = virtual_display_physical_size(hidpi ? 7680 : 3840, hidpi ? 4320 : 2160, hidpi);
+    EXPECT_NEAR(size.width_mm, 600.0, 0.01);
+    EXPECT_NEAR(size.height_mm, 337.5, 0.01);
+  }
+}
+
+TEST(MacosVirtualDisplayPhysicalSize, TheLongestSideIsBoundedInAnyShape) {
+  const auto portrait = virtual_display_physical_size(2160, 3840, false);
+  EXPECT_NEAR(portrait.height_mm, 600.0, 0.01);
+  EXPECT_NEAR(portrait.width_mm, 337.5, 0.01);
+  const auto ultrawide = virtual_display_physical_size(5120, 1440, false);
+  EXPECT_NEAR(ultrawide.width_mm, 600.0, 0.01);
+  EXPECT_NEAR(ultrawide.height_mm, 168.75, 0.01);
+}
+
 TEST(MacosPointerDisplay, ParsesOnlyWholeDisplayIds) {
   EXPECT_EQ(parse_display_identity("7"), std::optional<display_id_t> {7});
   EXPECT_FALSE(parse_display_identity(""));

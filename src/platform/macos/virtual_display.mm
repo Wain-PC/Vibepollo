@@ -106,8 +106,11 @@ namespace platf::macos_virtual_display {
     using configure_display_enabled_fn = CGError (*)(CGDisplayConfigRef, CGDirectDisplayID, bool);
 
     // A stable identity lets macOS remember the virtual display's arrangement between sessions.
+    // macOS also remembers a display that failed to come online, and then keeps it from coming
+    // online at that resolution. Product 1 reported a physical size macOS 27 refuses at 4K, so
+    // Macs that tried it hold that state; product 2 starts clean.
     constexpr unsigned int vendor_id = 0x5650;  // "VP"
-    constexpr unsigned int product_id = 0x0001;
+    constexpr unsigned int product_id = 0x0002;
     constexpr unsigned int serial_number = 0x0001;
 
     // A mode's transfer function, on macOS versions that take one. 1 makes the display HDR: macOS
@@ -655,9 +658,10 @@ namespace platf::macos_virtual_display {
       descriptor.name = name;
       descriptor.maxPixelsWide = pixel_width;
       descriptor.maxPixelsHigh = pixel_height;
-      // Only informs macOS's defaults: a Retina or a standard pixel density to match the mode.
-      const double ppi = hidpi ? 220.0 : 110.0;
-      descriptor.sizeInMillimeters = CGSizeMake(pixel_width / ppi * 25.4, pixel_height / ppi * 25.4);
+      // Informs macOS's defaults: a Retina or a standard pixel density to match the mode. It also
+      // decides whether the display comes online at all, so the policy bounds it.
+      const auto physical = macos_display_policy::virtual_display_physical_size(pixel_width, pixel_height, hidpi);
+      descriptor.sizeInMillimeters = CGSizeMake(physical.width_mm, physical.height_mm);
       descriptor.vendorID = vendor_id;
       descriptor.productID = product_id;
       descriptor.serialNum = serial;

@@ -110,6 +110,21 @@ namespace platf::macos_display_policy {
    */
   display_size_t virtual_display_size(int width, int height, bool hidpi);
 
+  /// A display's physical size, as its descriptor reports it to macOS.
+  struct physical_size_t {
+    double width_mm = 0;
+    double height_mm = 0;
+  };
+
+  /**
+   * @brief The physical size a virtual display reports for its pixels.
+   * @details 220 or 110 pixels per inch, a Retina or a standard density, up to a longest side of
+   *          600 mm (a 27-inch 16:9 panel). Larger than that it keeps its shape at a higher density:
+   *          macOS 27 never brings a virtual display online that reports a side much over 700 mm,
+   *          which a 3840x2160 display at 110 pixels per inch does.
+   */
+  physical_size_t virtual_display_physical_size(int pixel_width, int pixel_height, bool hidpi);
+
   /// The display a stream's touch port names (its output name is the display ID), if it names one.
   std::optional<display_id_t> parse_display_identity(std::string_view output_name);
 
