@@ -2220,6 +2220,22 @@ if(TARGET pyrowave-linux)
     set_tests_properties(pyrowave_linux_gpu PROPERTIES SKIP_RETURN_CODE 77 LABELS "integration;gpu")
 endif()
 
+if(APPLE AND TARGET pyrowave::capi)
+    # Real conversion, encoding and decoding on the Mac's GPU; skips off Apple silicon.
+    add_executable(test_pyrowave_macos_gpu test_pyrowave_macos_gpu.mm
+        "${SUNSHINE_TEST_REPOSITORY_ROOT}/src/platform/macos/pyrowave_core.mm"
+        "${SUNSHINE_TEST_REPOSITORY_ROOT}/src/pyrowave_policy.cpp")
+    set_source_files_properties(test_pyrowave_macos_gpu.mm
+        "${SUNSHINE_TEST_REPOSITORY_ROOT}/src/platform/macos/pyrowave_core.mm"
+        PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    target_include_directories(test_pyrowave_macos_gpu PRIVATE "${SUNSHINE_TEST_REPOSITORY_ROOT}")
+    target_compile_features(test_pyrowave_macos_gpu PRIVATE cxx_std_20)
+    target_link_libraries(test_pyrowave_macos_gpu PRIVATE pyrowave::capi
+        "-framework Foundation" "-framework CoreVideo" "-framework IOSurface" "-framework Metal")
+    add_test(NAME pyrowave_macos_gpu COMMAND test_pyrowave_macos_gpu)
+    set_tests_properties(pyrowave_macos_gpu PROPERTIES SKIP_RETURN_CODE 77 LABELS "integration;gpu" TIMEOUT 120)
+endif()
+
 # Compiles the production bootstrapper and tests migration using temporary data.
 # Never invokes MSI, services, driver installers, or certificate store mutations.
 if(WIN32)
