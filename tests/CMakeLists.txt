@@ -2232,6 +2232,15 @@ if(APPLE AND TARGET pyrowave::capi)
     target_compile_features(test_pyrowave_macos_gpu PRIVATE cxx_std_20)
     target_link_libraries(test_pyrowave_macos_gpu PRIVATE pyrowave::capi
         "-framework Foundation" "-framework CoreVideo" "-framework IOSurface" "-framework Metal")
+    # Manual benchmark, deliberately outside CTest to avoid concurrent GPU load.
+    add_executable(benchmark_pyrowave_macos benchmark_pyrowave_macos.mm
+        "${SUNSHINE_TEST_REPOSITORY_ROOT}/src/platform/macos/pyrowave_core.mm")
+    set_source_files_properties(benchmark_pyrowave_macos.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    target_include_directories(benchmark_pyrowave_macos PRIVATE "${SUNSHINE_TEST_REPOSITORY_ROOT}")
+    target_compile_features(benchmark_pyrowave_macos PRIVATE cxx_std_20)
+    target_link_libraries(benchmark_pyrowave_macos PRIVATE pyrowave::capi
+        "-framework Foundation" "-framework CoreVideo" "-framework IOSurface" "-framework Metal")
+
     add_test(NAME pyrowave_macos_gpu COMMAND test_pyrowave_macos_gpu)
     set_tests_properties(pyrowave_macos_gpu PROPERTIES SKIP_RETURN_CODE 77 LABELS "integration;gpu" TIMEOUT 120)
 endif()
